@@ -3,43 +3,64 @@
 #
 """
 fileasobj.py - Manage a local file as an object. Store contents in a 
-                uniq list and ignore commented lines.
+                unique list and ignore commented lines.
+                
+                Written to handle files that contain only text data, 
+                good for when you cannot or will not use a proper SQL
+                database. 
+                
+                Not useful for config files.
+                
 
 nullpass, 2012
+
+Examples:
+
+
+    # Reading a file, first example
+    my_file = FileAsObj()
+    if my_file.read('./input.txt'):
+        print 'File was loaded'
+    else:
+        print 'File was NOT loaded, here are the errors'
+        print my_file.Trace
+
+    # Reading a file, second example
+    file_clients = FileAsObj(os.path.join('etc','clients.info'), verbose=True)
+    if file_clients.Errors:
+        print '%s' % file_clients.Trace
+        sys.exit(10)
+
+
+    # If there is a line in file_foo that contains substring 'delete_me'
+    # then remove that line
+    file_foo.rm(file_foo.grep('delete_me'))
+
+
+Methods:
+    .grep   find substring in file
+    .egrep  regex-find substring in file
+    .add    Add given line to file
+    .rm     Remove a line from file, give entire matching line.
+    .check  Return line if line is in file, else return False
+    .dump   Print out file in unicode
+    .read   Read file into self.contents as list
+    .write  Save list to file overriding file on disk
+    
+Attributes you usually care about:
+    self.Trace  A string log of all methods run on object 
+                    including any errors
+
+    self.Errors A list log of any errors captured
+
+    Verbose     BOOLEAN, if true file is .read() verbatim, comments and
+                    short lines are NOT ignored
+                    
+
 
 2014.06.20 - V2, added [e]grep, dump and verbose; some code correction
 2012.08.15 - Full conversion to portability, added .read()
 2012.07.20 - Initial release
-
-
-______________________
-Example:
-
-$ cat ./input.txt
-valid entry
-#ignore this entry
-# another comment
-  # will read()/write() this entry
-site.ltd
-foo.bar
-# The next line will not be added
-a
-# But .lol will be added:
-.lol
-
-from fileasobj import FileAsObj
-input_txt = FileAsObj()
-
-if input_txt.read('./input.txt'):
-    print input_txt.contents
-    input_txt.add('foo')
-    input_txt.add('bar')
-    input_txt.write()
-else:
-    print input_txt.Trace
-    print input_txt.Errors
-
-# contents would then be: ['valid entry', '  # will read()/write() this entry', 'site.ltd', 'foo.bar', '.lol', 'foo', 'bar']
 
 """
 __version__ = '2.0.b'

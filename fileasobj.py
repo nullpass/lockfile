@@ -67,7 +67,6 @@ __version__ = '2.0.b'
 
 import sys
 import os
-import fileinput
 from platform import node
 import time
 import re
@@ -113,7 +112,10 @@ class FileAsObj:
             world that is usually a commented entry. 
         
         """
-        self.Birthday = (float(time.time()),str(time.strftime("%a %b %d %H:%M:%S %Z %Y", time.localtime())))
+        self.Birthday = (
+            float(time.time()),
+            str(time.strftime("%a %b %d %H:%M:%S %Z %Y", time.localtime()))
+        )
         #
         # Name of file this is running as
         self.thisExec = str(os.path.basename(sys.argv[0]))
@@ -133,13 +135,13 @@ class FileAsObj:
         # List of any exceptions caught
         self.Errors = []
         #
-        # String containing information about steps taken. Used for debugging
+        # String containing information about steps taken. For debugging
         self.Trace = ''
         #
         # If enabled, I will not unique contents or ignore comments.
         self.verbose = verbose
         #
-        #
+        # The list where contents of the file are stored
         self.contents = []
         #
         # If you gave me a file to read when instatiated, then do so.
@@ -147,14 +149,15 @@ class FileAsObj:
         if self.filename:
             self.read(self.filename)
         #
-        #declare current state is original data from thisFile.
+        # Declare current state is original data from thisFile.
         self.virgin = True
         
     def __log(self,thisEvent):
         """
         Private method to update self.Trace with str(thisEvent)
         """
-        self.Trace += str(time.strftime("%a %b %d %H:%M:%S %Z %Y", time.localtime()))+' '+self.thisHost+' '+self.thisProc+' '+str(thisEvent)+'\n'
+        NOW = time.strftime("%a %b %d %H:%M:%S %Z %Y", time.localtime())
+        self.Trace += '%s %s %s %s\n' % (NOW, self.thisHost, self.thisProc, thisEvent)
         return
     
     def read(self,thisFile):

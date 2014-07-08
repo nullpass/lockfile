@@ -17,7 +17,7 @@ h57GfUVnEe3pRoVq
 8tkLCmLm8Ze52djQ
 
 """
-___version___="2.0.3"
+___version___="2.0.6"
 import random
 import time
 import datetime
@@ -33,9 +33,9 @@ def planter():
     """
 
     Seed = int( time.time() ) * ( int( datetime.datetime.now().strftime("%f") ) + 29 )
-    Seed = Seed - int( datetime.datetime.now().strftime("%f") ) + 229
-    Seed = Seed + 1291
-    Seed = Seed / ( int( str(Seed)[-1] ) + 2 )
+    Seed = Seed - int( datetime.datetime.now().strftime("%f") ) + 113
+    Seed = Seed + 229
+    Seed = Seed / ( int( str(Seed)[-1] ) + 349 )
     return Seed
     
 def grow():

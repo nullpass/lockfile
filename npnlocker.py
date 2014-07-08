@@ -122,11 +122,11 @@ class Locker:
         #
         # Max age (in seconds) a lock file can be before it is 
         # considered invalid (too old to trust)
-        self.maxage = int(1)     # 1 second
-        self.maxage = int(300)   # 5 minutes
-        self.maxage = int(3600)  # 1 hour
-        self.maxage = int(43200) # 12 hours
-        self.maxage = int(86400) # 24 hours
+        self.maxage = 1     # 1 second
+        self.maxage = 300   # 5 minutes
+        self.maxage = 3600  # 1 hour
+        self.maxage = 43200 # 12 hours
+        self.maxage = 86400 # 24 hours
         #
         # Name of file this is running as
         self.thisExec = str(os.path.basename(sys.argv[0]))

@@ -175,30 +175,30 @@ class FileAsObj:
         try:
             self.__log('Read-only opening %s ' % self.filename)
             with open(self.filename, 'r') as fileHandle:
-				for line in fileHandle:
-					line = line.strip("\n")
-					#
-					# blank lines that were just \n become None, 
-					# so make sure this pass of line exists
-					if line:
-						if self.verbose:
-							#
-							# Some crazy person enabled verbose, just 
-							# add whatever is in the file to 
-							# self.contents.
-							# May whatever god you believe in 
-							#   have mercy on your code.
-							self.contents.append(line)
-						elif line[0] is not "#":
-							# Line is not a comment
-							#
-							#
-							# unique the contents of the thisFile when
-							# read()ing.
-							# Ignore lines that have fewer than 2 
-							# characters
-							if len(line) > 1 and line not in self.contents:
-								self.contents.append(line)
+                for line in fileHandle:
+                    line = line.strip("\n")
+                    #
+                    # blank lines that were just \n become None, 
+                    # so make sure this pass of line exists
+                    if line:
+                        if self.verbose:
+                            #
+                            # Some crazy person enabled verbose, just 
+                            # add whatever is in the file to 
+                            # self.contents.
+                            # May whatever god you believe in 
+                            #   have mercy on your code.
+                            self.contents.append(line)
+                        elif line[0] is not "#":
+                            # Line is not a comment
+                            #
+                            #
+                            # unique the contents of the thisFile when
+                            # read()ing.
+                            # Ignore lines that have fewer than 2 
+                            # characters
+                            if len(line) > 1 and line not in self.contents:
+                                self.contents.append(line)
             self.__log('Read %s lines' % len(self.contents))
             return True
         except Exception as e:
@@ -311,4 +311,4 @@ class FileAsObj:
         Print contents of file, useful when debugging.
         """
         for line in self.contents:
-            print unicode(line)
+            print(line)

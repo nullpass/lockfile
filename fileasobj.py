@@ -20,15 +20,15 @@ Examples:
     # Reading a file, first example
     my_file = FileAsObj()
     if my_file.read('./input.txt'):
-        print 'File was loaded'
+        print('File was loaded')
     else:
-        print 'File was NOT loaded, here are the errors'
-        print my_file.Trace
+        print('File was NOT loaded, here are the errors')
+        print(my_file.Trace)
 
     # Reading a file, second example
     file_clients = FileAsObj(os.path.join('etc','clients.info'), verbose=True)
     if file_clients.Errors:
-        print '%s' % file_clients.Trace
+        print(file_clients.Trace)
         sys.exit(10)
 
 
@@ -57,13 +57,13 @@ Attributes you usually care about:
                     short lines are NOT ignored
                     
 
-
+2014.08.11 - Tab fixes and print changes to comply with py3.
 2014.06.20 - V2, added [e]grep, dump and verbose; some code correction
 2012.08.15 - Full conversion to portability, added .read()
 2012.07.20 - Initial release
 
 """
-__version__ = '2.0.b'
+__version__ = '2.1.0'
 
 import sys
 import os
@@ -278,7 +278,7 @@ class FileAsObj:
                 for thisLine in self.contents:
                     fileHandle.write(thisLine+'\n')
             return True
-        except Excetion as e:
+        except Exception as e:
             self.__log('ERROR in write(self) : %s' % e)
             self.Errors.append(e)
             return False

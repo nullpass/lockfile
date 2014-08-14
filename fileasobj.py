@@ -57,13 +57,14 @@ Attributes you usually care about:
                     short lines are NOT ignored
                     
 
+2014.08.14 - Finally added __str__
 2014.08.11 - Tab fixes and print changes to comply with py3.
 2014.06.20 - V2, added [e]grep, dump and verbose; some code correction
 2012.08.15 - Full conversion to portability, added .read()
 2012.07.20 - Initial release
 
 """
-__version__ = '2.1.0'
+__version__ = '2.2.0'
 
 import sys
 import os
@@ -312,3 +313,12 @@ class FileAsObj:
         """
         for line in self.contents:
             print(line)
+    
+    def __str__(self):
+        """
+        There's been much debate as to whether this should
+        return self.filename or self.contents as a string.
+        My first use case needed it as a string so that's
+        what I'm publishing.
+        """
+        return '\n'.join(self.contents)

@@ -38,14 +38,14 @@ Examples:
 
 
 Methods:
-    .grep   find substring in file
-    .egrep  regex-find substring in file
-    .add    Add given line to file
-    .rm     Remove a line from file, give entire matching line.
-    .check  Return line if line is in file, else return False
-    .dump   Print out file in unicode
-    .read   Read file into self.contents as list
-    .write  Save list to file overriding file on disk
+    .grep    find substring in file
+    .egrep   regex-find substring in file
+    .add     Add given line to end of file
+    .rm      Remove a line from file, give entire matching line.
+    .check   Return line if line is in file, else return False
+    .read    Read file into self.contents as list
+    .write   Save list to file overriding file on disk
+    .replace Replace a whole line (old, new)
     
 Attributes you usually care about:
     self.Trace  A string log of all methods run on object 
@@ -54,17 +54,22 @@ Attributes you usually care about:
     self.Errors A list log of any errors captured
 
     Verbose     BOOLEAN, if true file is .read() verbatim, comments and
-                    short lines are NOT ignored
+                    short lines are NOT ignored and duplicate lines
+                    are preserved.
+                    Please remember that .rm() and .replace() will work
+                    on duplicate lines. 
                     
 
-2014.08.14 - Finally added __str__
-2014.08.11 - Tab fixes and print changes to comply with py3.
-2014.06.20 - V2, added [e]grep, dump and verbose; some code correction
-2012.08.15 - Full conversion to portability, added .read()
-2012.07.20 - Initial release
+An ever-so-slightly-non-apocryphal version history:
+    2014.09.09 - V3, added .replace(), removed .dump() and .inventory()
+    2014.08.14 - Finally added __str__
+    2014.08.11 - Tab fixes and print changes to comply with py3.
+    2014.06.20 - V2, added [e]grep, dump and verbose; some code correction
+    2012.08.15 - Full conversion to portability, added .read()
+    2012.07.20 - Initial release
 
 """
-__version__ = '2.2.0'
+__version__ = '3.0.0'
 
 import sys
 import os
@@ -98,7 +103,7 @@ class FileAsObj:
     
     """
     
-    def __init__(self,filename=None, verbose=False):
+    def __init__(self, filename=None, verbose=False):
         """
         
         You may specify the file to read() during instatiation, but be
@@ -152,13 +157,29 @@ class FileAsObj:
         #
         # Declare current state is original data from thisFile.
         self.virgin = True
+
+    def __str__(self):
+        """
+        There's been much debate as to whether this should
+        return self.filename or self.contents as a string.
+        My first use case needed it as a string so that's
+        what I'm publishing.
+        """
+        return '\n'.join(self.contents)
         
     def __log(self,thisEvent):
         """
         Private method to update self.Trace with str(thisEvent)
         """
         NOW = time.strftime("%a %b %d %H:%M:%S %Z %Y", time.localtime())
-        self.Trace += '%s %s %s %s\n' % (NOW, self.thisHost, self.thisProc, thisEvent)
+        #self.Trace += '%s %s %s %s\n' % (NOW, self.thisHost, self.thisProc, thisEvent)
+        self.Trace = '{OG}{Now} {Host} {Proc} {Event}\n'.format(
+            OG=self.Trace,
+            Now=time.strftime("%a %b %d %H:%M:%S %Z %Y", time.localtime()),
+            Host=self.thisHost,
+            Proc=self.thisProc,
+            Event=thisEvent,
+        )
         return
     
     def read(self,thisFile):
@@ -221,40 +242,32 @@ class FileAsObj:
             return needle
         return False
         
-    def add(self,thisItem):
+    def add(self,this):
         """
-        add thisItem to end of list unless it already exists.
+        add 'this' to end of list unless it already exists.
         
         RFC: should we add anyway if verbose == True?
         """
-        self.__log('Call to add "%s" to %s' % (thisItem, self.filename) )
-        if thisItem not in self.contents:
-            self.contents.append(thisItem)
+        self.__log('Call to add "%s" to %s' % (this, self.filename) )
+        if this not in self.contents:
+            self.contents.append(this)
             self.virgin = False
             return True
         return False
         
-    def rm(self,thisItem):
+    def rm(self, this):
         """
-        remove thisItem from contents.
+        Remove all occurances of 'this' from contents
+            where 'this' is an entire line.
         """
-        self.__log('Call to remove "%s" from %s' % (thisItem, self.filename) )
-        if thisItem in self.contents:
-            self.contents.remove(thisItem)
-            self.virgin = False
-            return True
+        self.__log('Call to remove "%s" from %s' % (this, self.filename) )
+        if this in self.contents:
+            while this in self.contents:
+                self.__log('Removed string from line {} of {}'.format(self.contents.index(this), self.filename))
+                self.contents.remove(this)
+                self.virgin = False
+        self.__log('"{}" not found in {}'.format(this, self.filename))
         return False
-        
-    def inventory(self):
-        """
-        return contents of self.contents
-        
-        Useful for printing contents, but hilariously redundant.
-        
-        I keep wanting to take this stupid thing out, but it makes me
-        laugh every time I see it. 
-        """
-        return self.contents
         
     def write(self):
         """
@@ -307,18 +320,22 @@ class FileAsObj:
                 return line
         return False
 
-    def dump(self):
+    def replace(self, old, new):
         """
-        Print contents of file, useful when debugging.
+        Replace all lines of file that match 'old' with 'new'
+        
+        The fact that this method (and .rm) work on duplicate matches
+        only matters if you _init_ the file with verbose=True because
+        .read() strips out duplicates by default.
         """
-        for line in self.contents:
-            print(line)
-    
-    def __str__(self):
-        """
-        There's been much debate as to whether this should
-        return self.filename or self.contents as a string.
-        My first use case needed it as a string so that's
-        what I'm publishing.
-        """
-        return '\n'.join(self.contents)
+        self.__log('Call to replace "{}" with "{}" in {}'.format(old, new, self.filename))
+        if old not in self.contents:
+            self.__log('"{}" not found in {}'.format(old, self.filename))
+            return False
+        #
+        while old in self.contents:
+            I = self.contents.index(old)
+            self.contents.remove(this)
+            self.contents.insert(I, new)
+            self.virgin = False
+        return True

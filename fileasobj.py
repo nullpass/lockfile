@@ -1,21 +1,24 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-#
 """
-fileasobj.py - Manage a local file as an object. Store contents in a 
-                unique list and ignore commented lines.
-                
-                Written to handle files that contain only text data, 
-                good for when you cannot or will not use a proper SQL
-                database. 
-                
-                Not useful for config files.
-                
+fileasobj.py - Manage a local file as an object. Store contents in a unique list and ignore commented lines.
+Written to handle files that contain only text data, good for when you cannot or will not use a proper SQL database. 
+    Not useful for config files.
 
-nullpass, 2012
+    nullpass, 2012
+    https://github.com/nullpass/npnutils
+
+Methods:
+    .grep    find first occurance of substring in file
+    .egrep   regex-find first occurance of substring in file (Remember to use '.*', not just '*')
+    .add     Add given line to end of file
+    .rm      Remove a line from file, give entire matching line.
+    .check   Return line if line is in file, else return False
+    .read    Read file into self.contents as list
+    .write   Save list to file overriding file on disk
+    .replace Replace a whole line (old, new)
 
 Examples:
-
 
     # Reading a file, first example
     my_file = FileAsObj()
@@ -26,33 +29,17 @@ Examples:
         print(my_file.Trace)
 
     # Reading a file, second example
-    file_clients = FileAsObj(os.path.join('etc','clients.info'), verbose=True)
-    if file_clients.Errors:
-        print(file_clients.Trace)
+    my_file = FileAsObj(os.path.join('home','bob','clients.txt'), verbose=True)
+    if my_file.Errors:
+        print(my_file.Trace)
         sys.exit(10)
+        
+    # Find mail servers in a hosts file that have IPs starting with 172
+    my_file.egrep('^172.*mail[0-9]')
 
-
-    # If there is a line in file_foo that contains substring 'delete_me'
-    # then remove that line
-    file_foo.rm(file_foo.grep('delete_me'))
-
-
-Methods:
-    .grep    find substring in file
-    .egrep   regex-find substring in file
-    .add     Add given line to end of file
-    .rm      Remove a line from file, give entire matching line.
-    .check   Return line if line is in file, else return False
-    .read    Read file into self.contents as list
-    .write   Save list to file overriding file on disk
-    .replace Replace a whole line (old, new)
-    
 Attributes you usually care about:
-    self.Trace  A string log of all methods run on object 
-                    including any errors
-
+    self.Trace  A string log of all methods run on object including any errors
     self.Errors A list log of any errors captured
-
     Verbose     BOOLEAN, if true file is .read() verbatim, comments and
                     short lines are NOT ignored and duplicate lines
                     are preserved.
@@ -60,7 +47,8 @@ Attributes you usually care about:
                     on duplicate lines. 
                     
 
-An ever-so-slightly-non-apocryphal version history:
+An ever-so-slightly-non-apocryphal non-minor version history:
+    2014.12.02 - V4, search methods can now return lists and .rm() works on lists.
     2014.09.09 - V3, added .replace(), removed .dump() and .inventory()
     2014.08.14 - Finally added __str__
     2014.08.11 - Tab fixes and print changes to comply with py3.
@@ -68,8 +56,17 @@ An ever-so-slightly-non-apocryphal version history:
     2012.08.15 - Full conversion to portability, added .read()
     2012.07.20 - Initial release
 
+TODO:
+    V5:
+        Create .replace_word(old[list|str], new[str]) `for word in line.split()...`
+            NOTE: Probably not going to add character replacement, seems
+            like too much and I don't have a use case for it.
+        
+        Let .replace() accept list() as argument for 'old'
+
+
 """
-__version__ = '3.0.0'
+__version__ = '4.0.0'
 
 import sys
 import os
@@ -89,7 +86,7 @@ class FileAsObj:
     By default data in self.contents is unique.
     Lines are sorted by whatever order they appear in the file.
     Elements can be added or removed with .add and .rm. 
-    The object's contents can be written back to the file, overwritting
+    The object's contents can be written back to the file, overwriting
     the file, with .write. 
     
     Error handling: I will not sys.exit or throw an exception. All errors
@@ -106,10 +103,10 @@ class FileAsObj:
     def __init__(self, filename=None, verbose=False):
         """
         
-        You may specify the file to read() during instatiation, but be
+        You may specify the file to read() during instantiation, but be
         sure to check for self.Errors. 
         
-        verbose - BE CAREFUL! if you enable verbose all of the lines in 
+        verbose - BE CAREFUL! If you enable verbose all of the lines in 
             your file will be added to self.contents. This includes 
             comments and duplicate lines. If you rely on this classes'
             .grep() or .egrep() methods be sure you understand that 
@@ -130,16 +127,16 @@ class FileAsObj:
             # If there's no name in argv[0], like if you call this from 
             # the Python shell, call this python_$$
             # Also catches names too short or long.
-            self.thisExec = 'python_'+str(os.getpid())
+            self.thisExec = 'python_{}'.format(os.getpid())
         #
         # Hostname
         self.thisHost = node()
         #
         # Current executable and PID, like myapp[12345]
-        self.thisProc = self.thisExec.rstrip('.py')+'['+str(os.getpid())+']'
+        self.thisProc = '{}[{}]'.format( self.thisExec.rstrip('.py'), os.getpid() )
         #
         # List of any exceptions caught
-        self.Errors = []
+        self.Errors = list()
         #
         # String containing information about steps taken. For debugging
         self.Trace = ''
@@ -148,9 +145,9 @@ class FileAsObj:
         self.verbose = verbose
         #
         # The list where contents of the file are stored
-        self.contents = []
+        self.contents = list()
         #
-        # If you gave me a file to read when instatiated, then do so.
+        # If you gave me a file to read when instantiated, then do so.
         self.filename = filename
         if self.filename:
             self.read(self.filename)
@@ -162,17 +159,16 @@ class FileAsObj:
         """
         There's been much debate as to whether this should
         return self.filename or self.contents as a string.
-        My first use case needed it as a string so that's
+        My first use case needed str(contents) so that's
         what I'm publishing.
         """
         return '\n'.join(self.contents)
         
     def __log(self,thisEvent):
         """
-        Private method to update self.Trace with str(thisEvent)
+        Private method to update self.Trace with thisEvent
         """
         NOW = time.strftime("%a %b %d %H:%M:%S %Z %Y", time.localtime())
-        #self.Trace += '%s %s %s %s\n' % (NOW, self.thisHost, self.thisProc, thisEvent)
         self.Trace = '{OG}{Now} {Host} {Proc} {Event}\n'.format(
             OG=self.Trace,
             Now=time.strftime("%a %b %d %H:%M:%S %Z %Y", time.localtime()),
@@ -182,22 +178,16 @@ class FileAsObj:
         )
         return
     
-    def read(self,thisFile):
+    def read(self,given_file):
         """
-        
-        Open thisFile and write its contents to self.contents.
-        Will not add duplicate lines or lines that start with #
-        
-        WILL add a line if it starts with a space or tab but has a #
-        later in the line.
-        
-        FileAsObj.read('./inputfile.txt')
+        Read given_file to self.contents, ignoring comments and duplicate lines.
+        WILL add a line if it starts with a space or tab but has a # later in the line.
         """
-        self.filename = str.strip(thisFile)
+        self.filename = str.strip(given_file)
         try:
-            self.__log('Read-only opening %s ' % self.filename)
-            with open(self.filename, 'r') as fileHandle:
-                for line in fileHandle:
+            self.__log('Read-only opening {}'.format(self.filename))
+            with open(self.filename, 'r') as handle:
+                for line in handle:
                     line = line.strip("\n")
                     #
                     # blank lines that were just \n become None, 
@@ -215,18 +205,16 @@ class FileAsObj:
                             # Line is not a comment
                             #
                             #
-                            # unique the contents of the thisFile when
-                            # read()ing.
-                            # Ignore lines that have fewer than 2 
-                            # characters
+                            # unique the contents of given_file when reading
+                            # Ignore lines that have fewer than 2 characters
                             if len(line) > 1 and line not in self.contents:
                                 self.contents.append(line)
-            self.__log('Read %s lines' % len(self.contents))
+            self.__log( 'Read {} lines'.format( len(self.contents) ) )
             return True
         except Exception as e:
-            self.__log('ERROR during read(self,thisFile) : %s' % e)
+            self.__log('ERROR during read(self,given_file) : {}'.format(e))
             self.Errors.append(e)
-            return False
+        return False
     
     def check(self,needle):
         """
@@ -242,32 +230,48 @@ class FileAsObj:
             return needle
         return False
         
-    def add(self,this):
+    def add(self,line, unique=True):
         """
-        add 'this' to end of list unless it already exists.
-        
-        RFC: should we add anyway if verbose == True?
+        add 'line' to end of contents.
+        By default will not create a duplicate line.
+        If unique is False will add regardless of contents.
         """
-        self.__log('Call to add "%s" to %s' % (this, self.filename) )
-        if this not in self.contents:
-            self.contents.append(this)
+        self.__log('Call to add "{}" to {}; unique={}'.format(line, self.filename,{unique}))
+        if unique == False:
+            self.contents.append(line)
+            self.virgin = False
+            return True
+        if line not in self.contents:
+            self.contents.append(line)
             self.virgin = False
             return True
         return False
         
     def rm(self, this):
         """
-        Remove all occurances of 'this' from contents
+        Remove all occurrences of 'this' from contents
             where 'this' is an entire line.
+        
+        If 'this' is a list object then remove all lines
+        that wholly match each element of 'this'
         """
-        self.__log('Call to remove "%s" from %s' % (this, self.filename) )
-        if this in self.contents:
-            while this in self.contents:
-                self.__log('Removed string from line {} of {}'.format(self.contents.index(this), self.filename))
-                self.contents.remove(this)
-                self.virgin = False
-        self.__log('"{}" not found in {}'.format(this, self.filename))
-        return False
+        self.__log('Call to remove "{}" from {}'.format(this, self.filename))
+        if isinstance(this, str):
+            this = this.split('\n')
+        if not isinstance(this, list):
+            # This usually means .rm() was called with False which is OK; log it but don't die.
+            self.__log('Argument given to .rm() not a string or list, was {}'.format(type(this)))
+            return False
+        for element in this:
+            if element in self.contents:
+                while element in self.contents:
+                    self.__log('Removed {} from line {} of {}'.format(element, self.contents.index(element), self.filename))
+                    self.contents.remove(element)
+                    self.virgin = False
+            else:
+                self.__log('"{}" not found in {}'.format(element, self.filename))
+                return False
+        return True
         
     def write(self):
         """
@@ -287,38 +291,63 @@ class FileAsObj:
 
         """
         try:
-            self.__log('Writing '+str(self.filename))
+            self.__log('Writing {}'.format(self.filename))
             with open(self.filename, 'w') as fileHandle:
                 for thisLine in self.contents:
                     fileHandle.write(thisLine+'\n')
             return True
         except Exception as e:
-            self.__log('ERROR in write(self) : %s' % e)
+            self.__log('ERROR in write(self) : {}'.format(e))
             self.Errors.append(e)
-            return False
+        return False
             
     def grep(self, needle):
         """
         Search for a string like `grep string file`
-        No regex support here.
+            No regex support here.
         
-        If found, return the line. This makes it easier to .rm(line)
+        If 1 match, return line as string.
+        If multiple matches return lines as list of strings.
+        If no matches return False
         """
+        r = list()
         for line in self.contents:
             if needle in line:
-                return line
+                r.append(line)
+        if r:
+            if len(r) == 1:
+                return str(r[0])
+            else:
+                return r
+        # all-else
         return False
 
     def egrep(self, pattern):
         """
         REGEX search for pattern in file
         
-        If found, return the line. This makes it easier to .rm(line)
+        If 1 match, return line as string.
+        If multiple matches return lines as list of strings.
+        If no matches return False
         """
+        try:
+            pattern = re.compile(pattern)
+        except Exception as e:
+            self.__log('ERROR in egrep({}) : {}'.format(pattern,e))
+            self.Errors.append(e)
+            return False
+        r = list()
         for line in self.contents:
-            if re.search(pattern, line):
-                return line
+            if pattern.search(line):
+                r.append(line)
+        if r:
+            if len(r) == 1:
+                return str(r[0])
+            else:
+                return r
+        # all-else
         return False
+
 
     def replace(self, old, new):
         """
@@ -333,9 +362,9 @@ class FileAsObj:
             self.__log('"{}" not found in {}'.format(old, self.filename))
             return False
         #
+        self.virgin = False
         while old in self.contents:
             I = self.contents.index(old)
-            self.contents.remove(this)
+            self.contents.remove(old)
             self.contents.insert(I, new)
-            self.virgin = False
         return True

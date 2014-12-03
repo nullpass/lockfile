@@ -22,7 +22,10 @@ Methods:
 
 Examples:
 
+    #
     # Reading a file, first example
+    #
+    # If you check the result of .read it will tell you if it worked.
     my_file = FileAsObj()
     if my_file.read('./input.txt'):
         print('File was loaded')
@@ -30,12 +33,16 @@ Examples:
         print('File was NOT loaded, here are the errors')
         print(my_file.Trace)
 
+    #
     # Reading a file, second example
+    #
+    # If you read the file when you instantiate you must check .Errors
     my_file = FileAsObj(os.path.join('home','bob','clients.txt'), verbose=True)
     if my_file.Errors:
         print(my_file.Trace)
         sys.exit(10)
 
+    #
     # Find mail servers in a hosts file that have IPs starting with 172
     my_file.egrep('^172.*mail[0-9]')
 
@@ -57,18 +64,18 @@ An ever-so-slightly-non-apocryphal non-minor version history:
     2012.08.15 - Full conversion to portability, added .read()
     2012.07.20 - Initial release
 
-TODO:
-    V5:
-        Create replace_word(old[list|str], new[str])
-            `for word in line.split()...`
-            NOTE: Probably not going to add character replacement, seems
-            like too much and I don't have a use case for it.
+Testing:
+    I write in Python 3.4x and occationally do testing in 2.6 and 2.7. This module
+    /should/ work with anything between 2.6 and 3.4+ but no promises.
 
+
+TODO:
+    4.1:
         Let .replace() accept list() as argument for 'old'
 
 
 """
-__version__ = '4.0.2'
+__version__ = '4.0.3'
 
 import sys
 import os
@@ -127,13 +134,13 @@ class FileAsObj:
             # If there's no name in argv[0], like if you call this from
             # the Python shell, call this python_$$
             # Also catches names too short or long.
-            self.this_exec = 'python_{}'.format(os.getpid())
+            self.this_exec = 'python_{0}'.format(os.getpid())
         #
         # Hostname
         self.nodename = node()
         #
         # Current executable and PID, like myapp[12345]
-        self.this_proc = '{}[{}]'.format(
+        self.this_proc = '{0}[{1}]'.format(
             self.this_exec.rstrip('.py'),
             os.getpid()
             )
@@ -188,7 +195,7 @@ class FileAsObj:
         """
         self.filename = str.strip(given_file)
         try:
-            self.__log('Read-only opening {}'.format(self.filename))
+            self.__log('Read-only opening {0}'.format(self.filename))
             with open(self.filename, 'r') as handle:
                 for line in handle:
                     line = line.strip("\n")
@@ -212,10 +219,10 @@ class FileAsObj:
                             # Ignore lines that have fewer than 2 characters
                             if len(line) > 1 and line not in self.contents:
                                 self.contents.append(line)
-            self.__log('Read {} lines'.format(len(self.contents)))
+            self.__log('Read {0} lines'.format(len(self.contents)))
             return True
         except Exception as err:
-            self.__log('ERROR during read(self, given_file) : {}'.format(err))
+            self.__log('ERROR during read(self, given_file) : {0}'.format(err))
             self.Errors.append(err)
         return False
 
@@ -239,7 +246,7 @@ class FileAsObj:
         By default will not create a duplicate line.
         If unique is False will add regardless of contents.
         """
-        self.__log('Call to add "{}" to {}; unique={}'.format(line, self.filename, unique))
+        self.__log('Call to add "{line}" to {file}; unique={uniq}'.format(line=line, file=self.filename, uniq=unique))
         if unique == False:
             self.contents.append(line)
             self.virgin = False
@@ -258,22 +265,22 @@ class FileAsObj:
         If 'this' is a list object then remove all lines
         that wholly match each element of 'this'
         """
-        self.__log('Call to remove "{}" from {}'.format(this, self.filename))
+        self.__log('Call to remove "{0}" from {1}'.format(this, self.filename))
         if isinstance(this, str):
             this = this.split('\n')
         if not isinstance(this, list):
             # This usually means .rm() was called with False which is OK;
             # log it but don't die.
-            self.__log('Argument given to .rm() not a string or list, was {}'.format(type(this)))
+            self.__log('Argument given to .rm() not a string or list, was {0}'.format(type(this)))
             return False
         for element in this:
             if element in self.contents:
                 while element in self.contents:
-                    self.__log('Removed {} from line {} of {}'.format(element, self.contents.index(element), self.filename))
+                    self.__log('Removed {0} from line {1} of {2}'.format(element, self.contents.index(element), self.filename))
                     self.contents.remove(element)
                     self.virgin = False
             else:
-                self.__log('"{}" not found in {}'.format(element, self.filename))
+                self.__log('"{0}" not found in {1}'.format(element, self.filename))
                 return False
         return True
 
@@ -295,13 +302,13 @@ class FileAsObj:
 
         """
         try:
-            self.__log('Writing {}'.format(self.filename))
+            self.__log('Writing {0}'.format(self.filename))
             with open(self.filename, 'w') as handle:
                 for this_line in self.contents:
                     handle.write(this_line+'\n')
             return True
         except Exception as err:
-            self.__log('ERROR in write(self) : {}'.format(err))
+            self.__log('ERROR in write(self) : {0}'.format(err))
             self.Errors.append(err)
         return False
 
@@ -337,7 +344,7 @@ class FileAsObj:
         try:
             pattern = re.compile(pattern)
         except Exception as err:
-            self.__log('ERROR in egrep({}) : {}'.format(pattern, err))
+            self.__log('ERROR in egrep({0}) : {1}'.format(pattern, err))
             self.Errors.append(err)
             return False
         retval = list()
@@ -360,9 +367,9 @@ class FileAsObj:
         only matters if you _init_ the file with verbose=True because
         .read() strips out duplicates by default.
         """
-        self.__log('Call to replace "{}" with "{}" in {}'.format(old, new, self.filename))
+        self.__log('Call to replace "{0}" with "{1}" in {2}'.format(old, new, self.filename))
         if old not in self.contents:
-            self.__log('"{}" not found in {}'.format(old, self.filename))
+            self.__log('"{0}" not found in {1}'.format(old, self.filename))
             return False
         #
         self.virgin = False

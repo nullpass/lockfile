@@ -1,9 +1,12 @@
 import re
 import fileasobj
 
+test_file = fileasobj.FileAsObj('File does not exist')
+print(test_file.Trace)
+
 #test_file = fileasobj.FileAsObj('Test.txt', verbose=True)
 test_file = fileasobj.FileAsObj('Test.txt')
-
+print(test_file.Trace)
 
 x = 'w.*rd'
 print('Find {}'.format(x))

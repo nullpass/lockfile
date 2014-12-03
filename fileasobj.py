@@ -68,7 +68,7 @@ TODO:
 
 
 """
-__version__ = '4.0.1'
+__version__ = '4.0.2'
 
 import sys
 import os
@@ -113,8 +113,6 @@ class FileAsObj:
             comments and duplicate lines. If you rely on this classes'
             .grep() or .egrep() methods be sure you understand that
             comments can be returned as a valid result!
-            My greps will return the first match found, in the real-
-            world that is usually a commented entry.
 
         """
         self.birthday = (
@@ -217,7 +215,7 @@ class FileAsObj:
             self.__log('Read {} lines'.format(len(self.contents)))
             return True
         except Exception as err:
-            self.__log('ERROR during read(self,given_file) : {}'.format(err))
+            self.__log('ERROR during read(self, given_file) : {}'.format(err))
             self.Errors.append(err)
         return False
 

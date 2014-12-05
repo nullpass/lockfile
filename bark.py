@@ -1,114 +1,150 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python -B
 # -*- coding: utf-8 -*-
-#
 """
+bark.py - Log or print given string. If unable to log, print.
 
-bark.py - Log or print given string, if unable to log, print.
-
-nullpass, 2012
-
-2012.08.11 - Convert bark function to class
-2012.08.08 - Removed 'debugg' check, leave bark calling up to caller
-2012.08.05 - Initial (public) release.
+    nullpass, 2012
+    https://github.com/nullpass/npnutils
 
 Examples:
 
-# Log 'Hello World' to myapplication.log
-from bark import Bark
-bark = Bark()
-bark.logfile = '/var/log/myapplication.log'
-bark.do('Hello World.')
+    # Log 'Hello World' to myapplication.log
+    from bark import Bark
+    bark = Bark()
+    bark.logfile = '/var/log/myapplication.log'
+    bark('Hello World.')
 
-# Print 'Hello World' in log format
-from bark import Bark
-bark = Bark()
-bark.logfile = False
-bark.do('Hello World.')
+    # Print 'Hello World' in log format
+    from bark import Bark
+    bark = Bark()
+    bark.logfile = False
+    bark('Hello World.')
 
-# Disable output
-from bark import Bark
-bark = Bark()
-bark.Enabled = False
-bark.do('Hello World.') # This won't be logged or printed.
+    # Disable output
+    from bark import Bark
+    bark = Bark()
+    bark.enabled = False
+    bark('Hello World.') # This won't be logged or printed.
 
-# Or call from command line and use default settings
-$ python ./bark.py hello world
-$ cat ~/log/bark.log
-Sat Aug 11 18:33:45 EDT 2012 bark[4535] hello world 
+    # Or call from command line and use default settings
+    $ python ./bark.py hello world
+    $ cat ~/log/bark.log
+    Sat Aug 11 18:33:45 EDT 2012 bark[4535] hello world
+
+    # See process name, pid, log file and time of __init__
+    bark = Bark()
+    print(bark)
+
 
 """
-__version__='4.1.0'
+__version__ = '5.0.0'
 import time
 import os
 from platform import node
-from re import search
 import sys
+sys.dont_write_bytecode = True
 
-class Bark:
+class Bark(object):
     """
     The Mighty Bark Class.
-    
+
     Bark is a devel-logging tool to make it easier to log and/or print
     messages (usually debug messages) and allows the devel to quickly
-    enable/disable those debug messages globally. 
-    
+    enable/disable those debug messages globally.
+
     This program was born as a simple function which printed a given
     string to STDOUT and included a locale timestamp. The function kept
     getting copied and re-used in most of my programs so I converted it
     to a module, and eventually a class. Making it a class enabled easy
-    setting management for Enable and Bark.logfile. 
-    
+    setting management for Enable and Bark.logfile.
+
     """
     def __init__(self):
         """
         Define default settings which are:
-        Bark is Enabled
-        Log file is saved in ~log/ using name of calling Python script.
-        Default is to log to log file, not print.
+            Bark is enabled.
+            Log file is saved in ~log/ using name of calling script.
+            Default is to log to the log file, not print.
         """
-        self.Birthday = (float(time.time()),str(time.strftime("%a %b %d %H:%M:%S %Z %Y", time.localtime())))
-        self.Enabled = True
+        self.birthday = (
+            float(time.time()),
+            str(time.strftime('%a, %d %b %Y %H:%M:%S +0000', time.gmtime()))
+            )
+        self.enabled = True
         #
-        # Try to get base name of current program minus the extension
-        m = search( '^([a-zA-Z0-9\-_]+)\.*' , os.path.basename(sys.argv[0]) )
-        if m:
-            self.thisExec = m.group(1)
-        else:
-            # Current program doesn't have an extension- so just use it.
-            self.thisExec = os.path.basename(sys.argv[0])
         #
-        # If the name of the executable is too short or None make it py
-        if len(self.thisExec) < 3:
-            self.thisExec = 'python'
+        self.pid = str(os.getpid())
         #
-        # Hostname
-        self.thisHost = node()
+        # Name of file this is running as
+        arg0 = str(os.path.basename(sys.argv[0])).replace('.py', '')
+        if len(arg0) < 3 or len(arg0) > 255:
+            #
+            # If arg zero is invalid, name me Python
+            arg0 = 'Python'
         #
-        # Current executable and PID
-        self.thisProc = self.thisExec+'['+str(os.getpid())+']'
+        # Current executable and PID, like myapp[12345]
+        self.logname = '{0}[{1}]'.format(arg0, self.pid)
         #
-        self.logfile = os.path.expanduser('~')+'/log/'+self.thisExec+'.log'
-    def do(self,thisEvent):
+        # Full path to log file
+        self.logfile = '{0}.log'.format(
+            os.path.join(os.path.expanduser('~'), 'log', arg0),
+            )
+        self.this_event = ''
+
+    def __call__(self, this):
         """
-        bark.do('Hello World!')
+        Bark 'this' when the instance is called directly.
+
+        Will attempt to write your bark to your log file. If
+        the path leading to that file does not exist or you
+        do not have permissions to add it this method will
+        report that and print your bark. Any other exception
+        will cause a fatal.
         """
-        if self.Enabled == True:
-            if self.logfile:
-                try:
-                    #
-                    # Try to log event to log file, create if doesnt exist.
-                    self.fileHandle = open(self.logfile, 'a')
-                    self.fileHandle.write(str(time.strftime("%a %b %d %H:%M:%S %Z %Y", time.localtime()))+' '+self.thisHost+' '+self.thisProc+' '+str(thisEvent)+'\n')
-                    self.fileHandle.close()
-                except Exception as self.thisError:
-                    #
-                    # Else print error and event
-                    # Sun Aug 05 14:20:37 EDT 2012 myprogram[3125] [Errno 2] No such file or directory: '/home/me/log/myprogram.log'
-                    # Sun Aug 05 14:20:37 EDT 2012 myprogram[3125] hello world
-                    print str(time.strftime("%a %b %d %H:%M:%S %Z %Y", time.localtime()))+' '+self.thisHost+' '+self.thisProc+' '+str(self.thisError)
-                    print str(time.strftime("%a %b %d %H:%M:%S %Z %Y", time.localtime()))+' '+self.thisHost+' '+self.thisProc+' '+str(thisEvent)
-            else:
-                print str(time.strftime("%a %b %d %H:%M:%S %Z %Y", time.localtime()))+' '+self.thisHost+' '+self.thisProc+' '+str(thisEvent)
+        if not self.enabled == True:
+            return
+        self.this_event = '{now} {hostname} {proc} {this}\n'.format(
+            now=time.strftime('%a, %d %b %Y %H:%M:%S +0000', time.gmtime()),
+            hostname=node(),
+            proc=self.logname,
+            this=this
+            )
+        if not self.logfile:
+            print(self.this_event)
+            return
+        try:
+            with open(self.logfile, 'a') as handle:
+                handle.write(self.this_event)
+        except (FileNotFoundError, PermissionError) as err:
+            print(err)
+            print(self.this_event)
+
+    def __str__(self):
+        """
+        Return process name, pid and time of init.
+        """
+        return '{0} {1} {2}'.format(self.logname, self.logfile, self.birthday)
+
+    def do(self, this):
+        # pylint: disable=invalid-name
+        """
+        Dep support for old code.
+        """
+        self('The bark.do(...) method is depricated. Just bark(...)')
+        self(this)
+
+    def bark(self, this):
+        """
+        Dep support for old code.
+        """
+        self('The bark.bark(...) method is depricated. Just bark(...)')
+        self(this)
+
+    def last(self):
+        """
+        Show last event barked
+        """
+        self(self.this_event)
 
 def main():
     """
@@ -116,14 +152,14 @@ def main():
     Anti-TODO: Don't expand this to accept options via arguments. If you
     need that much complexity use your system's `logger`.
     """
-    if not sys.argv[1:] and sys.stdin.isatty(): sys.exit(1)
+    if not sys.argv[1:] and sys.stdin.isatty():
+        sys.exit(1)
     bark = Bark()
-    barkMessage = ''
-    Arguments = sys.argv[1:]
-    for Argument in Arguments:
-        barkMessage += str(Argument)+' '
-    bark.do(barkMessage)
-    return 0
+    msg = ''
+    for arg in sys.argv[1:]:
+        msg += str(arg)+' '
+    bark(msg)
+    return
 
 if __name__ == '__main__':
     main()

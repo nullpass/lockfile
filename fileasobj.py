@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-#  pylint: disable=line-too-long, W0703
+#  pylint: disable=line-too-long
 
 """
 fileasobj.py - Manage a local file as an object. Store contents in a unique list and ignore commented lines.
 Written to handle files that contain only text data, good for when you cannot or will not use a proper SQL database.
     Not useful for config files.
+
+    Written by a SysAdmin who needed to treat files like databases.
 
     nullpass, 2012
     https://github.com/nullpass/npnutils
@@ -31,7 +33,7 @@ Examples:
         print('File was loaded')
     else:
         print('File was NOT loaded, here are the errors')
-        print(my_file.Trace)
+        print(my_file.trace)
 
     #
     # Reading a file, second example
@@ -39,7 +41,7 @@ Examples:
     # If you read the file when you instantiate you must check .Errors
     my_file = FileAsObj(os.path.join('home','bob','clients.txt'), verbose=True)
     if my_file.Errors:
-        print(my_file.Trace)
+        print(my_file.trace)
         sys.exit(10)
 
     #
@@ -47,8 +49,8 @@ Examples:
     my_file.egrep('^172.*mail[0-9]')
 
 Attributes you usually care about:
-    self.Trace  A string log of all methods run on object including any errors
-    self.Errors A list log of any errors captured
+    self.trace  A string log of all methods run on object including any errors
+    self.errors A list log of any errors captured
     Verbose     BOOLEAN, if true file is .read() verbatim, comments and
                     short lines are NOT ignored and duplicate lines
                     are preserved.
@@ -75,7 +77,7 @@ TODO:
 
 
 """
-__version__ = '4.0.3'
+__version__ = '4.0.4'
 
 import sys
 import os
@@ -84,7 +86,8 @@ import time
 import re
 
 
-class FileAsObj:
+class FileAsObj(object):
+    # ylint: disable=too-many-instance-attributes
     """
     Manage a file as an object-
             -For when you just can't be bothered to use a real database.
@@ -98,22 +101,22 @@ class FileAsObj:
     The object's contents can be written back to the file, overwriting
     the file, with .write.
 
-    Error handling: I will not sys.exit or throw an exception. All errors
-        are logged to self.Trace and self.Errors. It is the duty of the
-        calling code to check for self.Errors and act however is needed.
+    Error handling: I will try not to sys.exit or throw an exception.
+        Ideally all errors are logged to self.trace and self.errors.
+        It is thus the duty of the calling code to check for self.errors
+        and act however is needed.
 
-        self.Trace is a log of everything the instance of this class
+        self.trace is a log of everything the instance of this class
         did. If there is an exception it is included.
 
-        self.Errors is a list of exceptions.
+        self.errors is a list() of exception objects.
 
     """
 
     def __init__(self, filename=None, verbose=False):
         """
-
         You may specify the file to read() during instantiation, but be
-        sure to check for self.Errors.
+        sure to check for self.errors.
 
         verbose - BE CAREFUL! If you enable verbose all of the lines in
             your file will be added to self.contents. This includes
@@ -124,45 +127,36 @@ class FileAsObj:
         """
         self.birthday = (
             float(time.time()),
-            str(time.strftime("%a %b %d %H:%M:%S %Z %Y", time.localtime()))
-        )
-        #
-        # Name of file this is running as
-        self.this_exec = str(os.path.basename(sys.argv[0]))
-        if len(self.this_exec) < 3 or len(self.this_exec) > 255:
-            #
-            # If there's no name in argv[0], like if you call this from
-            # the Python shell, call this python_$$
-            # Also catches names too short or long.
-            self.this_exec = 'python_{0}'.format(os.getpid())
-        #
-        # Hostname
-        self.nodename = node()
-        #
-        # Current executable and PID, like myapp[12345]
-        self.this_proc = '{0}[{1}]'.format(
-            self.this_exec.rstrip('.py'),
-            os.getpid()
+            str(time.strftime('%a, %d %b %Y %H:%M:%S +0000', time.gmtime()))
             )
         #
+        # Name of file this is running as
+        arg0 = str(os.path.basename(sys.argv[0])).replace('.py', '')
+        if len(arg0) < 3 or len(arg0) > 255:
+            #
+            # If arg zero is invalid, name me Python
+            arg0 = 'Python'
+        #
+        # Current executable and PID, like myapp[12345]
+        self.logname = '{0}[{1}]'.format(arg0, os.getpid())
+        #
         # List of any exceptions caught
-        self.Errors = list()
+        self.errors = list()
         #
-        # String containing information about steps taken. For debugging
-        self.Trace = ''
-        #
-        # If enabled, I will not unique contents or ignore comments.
-        self.verbose = verbose
+        # Multi-line string of all steps taken.
+        self.trace = ''
         #
         # The list where contents of the file are stored
         self.contents = list()
         #
-        # If you gave me a file to read when instantiated, then do so.
+        # Accept filename during instantiation, default is None.
         self.filename = filename
-        if self.filename:
-            self.read(self.filename)
         #
-        # Declare current state is original data from thisFile.
+        # If you gave me a file to read when instantiated, then do so.
+        if self.filename:
+            self.read(self.filename, verbose)
+        #
+        # Declare current state is original data from self.filename.
         self.virgin = True
 
     def __str__(self):
@@ -176,18 +170,19 @@ class FileAsObj:
 
     def __log(self, this):
         """
-        Private method to update self.Trace with thisEvent
+        Private method to update self.trace with thisEvent
         """
-        self.Trace = '{OG}{Now} {Host} {Proc} {Event}\n'.format(
-            OG=self.Trace,
-            Now=time.strftime("%a %b %d %H:%M:%S %Z %Y", time.localtime()),
-            Host=self.nodename,
-            Proc=self.this_proc,
+        self.trace = '{OG}{Now} {Host} {Proc} {Event}\n'.format(
+            OG=self.trace,
+            Now=time.strftime('%a %b %d %H:%M:%S %Z %Y', time.localtime()),
+            Host=node(),
+            Proc=self.logname,
             Event=this,
         )
         return
 
-    def read(self, given_file):
+    def read(self, given_file, verbose=False):
+        # pylint: disable=broad-except
         """
         Read given_file to self.contents, ignoring comments and duplicate lines.
         WILL add a line if it starts with a space or tab but has a # later in
@@ -198,12 +193,12 @@ class FileAsObj:
             self.__log('Read-only opening {0}'.format(self.filename))
             with open(self.filename, 'r') as handle:
                 for line in handle:
-                    line = line.strip("\n")
+                    line = line.rstrip('\r\n')
                     #
                     # blank lines that were just \n become None,
                     # so make sure this pass of line exists
                     if line:
-                        if self.verbose:
+                        if verbose:
                             #
                             # Some crazy person enabled verbose, just
                             # add whatever is in the file to
@@ -211,7 +206,7 @@ class FileAsObj:
                             # May whatever god you believe in
                             #   have mercy on your code.
                             self.contents.append(line)
-                        elif line[0] is not "#":
+                        elif line[0] is not '#':
                             # Line is not a comment
                             #
                             #
@@ -223,7 +218,7 @@ class FileAsObj:
             return True
         except Exception as err:
             self.__log('ERROR during read(self, given_file) : {0}'.format(err))
-            self.Errors.append(err)
+            self.errors.append(err)
         return False
 
     def check(self, needle):
@@ -246,7 +241,7 @@ class FileAsObj:
         By default will not create a duplicate line.
         If unique is False will add regardless of contents.
         """
-        self.__log('Call to add "{line}" to {file}; unique={uniq}'.format(line=line, file=self.filename, uniq=unique))
+        self.__log('Call to add "{0}" to {1}; unique={2}'.format(line, self.filename, unique))
         if unique == False:
             self.contents.append(line)
             self.virgin = False
@@ -258,6 +253,7 @@ class FileAsObj:
         return False
 
     def rm(self, this):
+        # pylint: disable=invalid-name
         """
         Remove all occurrences of 'this' from contents
             where 'this' is an entire line.
@@ -285,6 +281,7 @@ class FileAsObj:
         return True
 
     def write(self):
+        # pylint: disable=broad-except
         """
         write self.contents to self.filename
         self.filename was defined during .read()
@@ -309,7 +306,7 @@ class FileAsObj:
             return True
         except Exception as err:
             self.__log('ERROR in write(self) : {0}'.format(err))
-            self.Errors.append(err)
+            self.errors.append(err)
         return False
 
     def grep(self, needle):
@@ -334,6 +331,7 @@ class FileAsObj:
         return False
 
     def egrep(self, pattern):
+        # pylint: disable=broad-except
         """
         REGEX search for pattern in file
 
@@ -345,7 +343,7 @@ class FileAsObj:
             pattern = re.compile(pattern)
         except Exception as err:
             self.__log('ERROR in egrep({0}) : {1}'.format(pattern, err))
-            self.Errors.append(err)
+            self.errors.append(err)
             return False
         retval = list()
         for line in self.contents:
@@ -372,9 +370,9 @@ class FileAsObj:
             self.__log('"{0}" not found in {1}'.format(old, self.filename))
             return False
         #
-        self.virgin = False
         while old in self.contents:
             index = self.contents.index(old)
+            self.virgin = False
             self.contents.remove(old)
             self.contents.insert(index, new)
         return True

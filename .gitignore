@@ -1,9 +1,5 @@
-# Windows image file caches
-Thumbs.db
-ehthumbs.db
-
-# Folder config file
-Desktop.ini
+*.db
+*.ini
 
 # Recycle Bin used on file shares
 $RECYCLE.BIN/
@@ -13,13 +9,6 @@ $RECYCLE.BIN/
 *.msi
 *.msm
 *.msp
-
-# =========================
-# Operating System Files
-# =========================
-
-# OSX
-# =========================
 
 .DS_Store
 .AppleDouble
@@ -31,8 +20,7 @@ Icon
 # Thumbnails
 ._*
 
-# Files that might appear on external disk
-.Spotlight-V100
-.Trashes
 
+.Spotl*
+.Trash*
 *.pyc

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python -B
 # -*- coding: utf-8 -*-
 #  pylint: disable=W0612
 """
@@ -17,11 +17,12 @@ h57GfUVnEe3pRoVq
 8tkLCmLm8Ze52djQ
 
 """
-___version___ = "3.0.0"
+___version___ = '3.0.1'
 import random
 import time
 import datetime
-from sys import argv
+import sys
+sys.dont_write_bytecode = True
 
 TEMPLATE = """
 pathic - {base}
@@ -39,8 +40,8 @@ def planter():
     %f 	Microsecond as a decimal number [0,999999], zero-padded on the left
     """
 
-    seed = int(time.time()) * (int(datetime.datetime.now().strftime("%f")) + 29)
-    seed = seed - int(datetime.datetime.now().strftime("%f")) + 113
+    seed = int(time.time()) * (int(datetime.datetime.now().strftime('%f')) + 29)
+    seed = seed - int(datetime.datetime.now().strftime('%f')) + 113
     seed = seed + 229
     seed = ((seed * (int(str(seed)[-1]) + 349)) * seed) - (seed + seed)
     return int(seed)
@@ -51,7 +52,7 @@ def grow():
     """
     #
     # Define root list of friendly strings
-    root = list("abcdefghijkmopqrstuvwxyzQWERTYUPLKJHGFDAZXCVN92345678")
+    root = list('abcdefghijkmopqrstuvwxyzQWERTYUPLKJHGFDAZXCVN92345678')
     #
     # Create a random number of times to shuffle the list
     for i in range(random.randint(29, 1129)):
@@ -96,9 +97,9 @@ def main():
     """
     main
     """
-    base = ""
-    if argv[1:]:
-        base = argv[1]
+    base = ''
+    if sys.argv[1:]:
+        base = sys.argv[1]
     random.seed(planter())
     print(TEMPLATE.format(
         base=base,

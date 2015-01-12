@@ -1,8 +1,7 @@
-#!/usr/bin/env python2.7 -B
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# pylint: disable=broad-except
 """
-npnlocker.py - Provide easy lock file management as a class.
+locker.py - Provide easy lock file management as a class.
     "Dissatisfied with the shape of a perfect circle
         I've reinvented the wheel, again."
 
@@ -12,7 +11,7 @@ by: nullpass, 2012; based loosely on gekitsuu's Mutex()
 Examples:
     # Try to create a lock file using default settings (see __init__)
     #
-    from npnlocker import Locker
+    from locker import Locker
     mylock = Locker()
     if mylock.create():
         ...
@@ -25,7 +24,7 @@ Examples:
     # Don't allow a previous instance to be killed.
     # Set maximum age of the lock file to be 999999999 seconds.
     #
-    from npnlocker import Locker
+    from locker import Locker
     mylock = Locker()
     mylock.lockfile = '/var/run/custom.pid'
     mylock.maxage = 999999999
@@ -82,7 +81,7 @@ TODO:
         caller if locker was successful. --DONE, check main() for usage
 """
 
-__version__ = '0.1.b'
+__version__ = '0.1.1b'
 import time
 import os
 from platform import node
@@ -313,14 +312,14 @@ def main():
     """
     If you want to use this for shell scripts or unix apps do this:
 
-    me@pybox01:~$ python ./npnlocker.py create ./foo.pid ; echo $?
+    me@pybox01:~$ python ./locker.py create ./foo.pid ; echo $?
     0
-    me@pybox01:~$ python ./npnlocker.py delete ./foo.pid ; echo $?
+    me@pybox01:~$ python ./locker.py delete ./foo.pid ; echo $?
     0
     me@pybox01:~$
 
     in shell code
-    python ./npnlocker.py create ./foo.pid || exit $?
+    python ./locker.py create ./foo.pid || exit $?
 
     """
     if not sys.argv[1:] and sys.stdin.isatty():

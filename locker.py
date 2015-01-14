@@ -88,8 +88,8 @@ from platform import node
 import sys
 sys.dont_write_bytecode = True
 
+
 class Locker(object):
-    # pylint: disable=too-many-instance-attributes
     """
     Yu' sure gotta purddy lockfile.
     """
@@ -146,9 +146,7 @@ class Locker(object):
         self.locked = False
         self.log = self.Log(self.logname)
 
-
     class Log(object):
-        # pylint: disable=too-few-public-methods
         """ Track and report steps taken in this app."""
         def __init__(self, logname):
             """ Create new log """
@@ -168,7 +166,6 @@ class Locker(object):
         def __str__(self):
             """ Return my log as multiline string """
             return self.trace
-
 
     def create(self):
         """
@@ -209,7 +206,6 @@ class Locker(object):
         self.delete()
 
     def check(self):
-        # pylint: disable=too-many-return-statements
         """
         Check for lock file, running proc, and name of running proc.
 
@@ -279,8 +275,6 @@ class Locker(object):
             # like this application, refuse new lock
             self.log('Lock file is recent, diff={0}'.format(diff))
             return False
-        # all-else
-        return False
 
     def murder(self, oldpid=None):
         """
@@ -307,6 +301,7 @@ class Locker(object):
             # No pid or no permissions (usually)
             self.log(error)
         return False
+
 
 def main():
     """

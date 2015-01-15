@@ -1,170 +1,117 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-locker.py - Provide easy lock file management as a class.
-    "Dissatisfied with the shape of a perfect circle
-        I've reinvented the wheel, again."
+locker.py - Provide easy lock file management as a class for other Python programs.
 
+    by: nullpass, 2012-2015+; based loosely on gekitsuu's Mutex().
 
-by: nullpass, 2012; based loosely on gekitsuu's Mutex()
+    Tested with Python 2.6.6 and 3.4.2.
 
-Examples:
-    # Try to create a lock file using default settings (see __init__)
-    #
-    from locker import Locker
-    mylock = Locker()
-    if mylock.create():
-        ...
-        ...code that requires a lock file here...
-        ...
-        mylock.delete()
-
-
-    # Try to create a lock file using a custom pid file.
-    # Don't allow a previous instance to be killed.
-    # Set maximum age of the lock file to be 999999999 seconds.
-    #
-    from locker import Locker
-    mylock = Locker()
-    mylock.lockfile = '/var/run/custom.pid'
-    mylock.maxage = 999999999
-    mylock.Killable = False
-    if mylock.create():
-        print 'I made a lock file'
-        print 'Debugg output: \n'+str(mylock.Trace)
-    else:
-        print 'unable to create lock file'
-        print 'Errors: \n'+str(mylock.Errors)
-
-
-Notes:
-    Be mindful of 'thisExec' even if you don't override it with a custom
-    name.
-    The contents of /proc/'oldpid'/cmdline could be anything, and since the
-    logic only does a very simple substring check you might end up `kill`ing
-    a legitimate process that has a similar file name or argument.
-    For example, if you named your 'thisExec' bob and there was another
-    process that started later and happened to re-use the PID for a previous
-    instance of `bob` and was named 'john.sh --path=/var/bob' then that
-    process would get `kill`ed.
-    The self.killable variable gives you the chance to be careful with
-    process management without sacrificing lock file functionality.
-
-    *You may think it is rather silly to worry about PID re-use, but I have
-    to code on/for systems that stay online for years at a time, some have
-    been up for over a decade, but whether or not it makes sense it is still
-    a valid error condition and one that is easy to check for.
-
-Logic:
-    If lock file does not exist: OK, create
-
-    If lock file exists but proc not running: OK, delete, create
-        [Previous instance failed to remove its lock file before exiting]
-
-    If PID running and process matches str(thisExec) and the lock file is
-        older than int(maxage): OK, kill, delete, create
-        [A previous instance is stuck, kill it and allow a new instance to run]
-
-    If PID running but the name of the process does not match this_exec: OK,
-        delete old lock file and create new one
-        [Previous instance failed to remove its lock file and some other
-        process spawned later with the same PID]*
-
-    If lock file exists, PID running and the process matches str(thisExec): FAIL
-        [Previous instance still running, not old enough to kill]
-
-
-TODO:
-    1. os.kill in Locker.murder() needs more testing
-    2. Add basic funtionality to main() to allow locking with default
-        settings from the command line. Use sys.exit(0|1) to inform
-        caller if locker was successful. --DONE, check main() for usage
 """
 
-__version__ = '0.1.1b'
+__version__ = '0.3.b'
 import time
 import os
 from platform import node
 import sys
-sys.dont_write_bytecode = True
 
 
 class Locker(object):
     """
-    Yu' sure gotta purddy lockfile.
+    Examples, try to create a lock file using default settings (see __init__)
+
+        my_lock_file = Locker()
+        if my_lock_file.create():
+            #
+            # code that requires a lock file here
+            #
+            my_lock_file.delete()
+
+
+    Example, try to create a lock file using a custom pid file. Allow a previous instance to be killed. Set
+        maximum age of the lock file to be 999999999 seconds, and explicitly define the name of the process to look for.
+
+        my_lock_file = Locker(file='/var/run/custom.pid', age_limit = 999999999, kill=True, name='bob.py')
+        if my_lock_file.create():
+            print('I made a lock file')
+            print(my_lock_file.log)
+        else:
+            print('unable to create lock file')
+            print(my_lock_file.log)
+
+
+    Notes:
+        Be mindful of 'self.name' even if you don't override it with a custom name.
+        The contents of /proc/{pid}/cmdline could be anything, and since the logic only does a very simple substring
+            check you might end up `kill`ing a legitimate process that has a similar file name or argument.
+        For example, if you set name to 'bob' and there was another process that started later and happened to re-
+            use the PID for a previous instance of `bob` and was named 'john.sh --path=/var/bob' then that process would
+            get `kill`ed.
+        The self.kill variable gives you the chance to be careful with process management without sacrificing lock
+            file functionality.
+
+        *You may think it is rather silly to worry about PID re-use, but I have to code on/for systems that stay online
+            for years at a time, some have been up for over a decade, but whether or not it makes sense it is still a
+            valid error condition and one that is easy to check for.
     """
-    def __init__(self):
+
+    def __init__(self, age_limit=3600, file='/var/run/{name}.pid', kill=False, name=None):
         """
-        Give birth, define default settings.
+        Default settings:
+            age_limit: 36000 seconds (1 hour)
+            name: Actual name of this process else 'Python'
+            file: /var/run/{{name}}.pid
+            kill: False
         """
         self.birthday = (
             float(time.time()),
             str(time.strftime('%a, %d %b %Y %H:%M:%S +0000', time.gmtime()))
             )
-        #
-        # True = Let Locker.murder() os.kill an old pid found where the name
-        #        of the process matches this application.
-        # If False, Locker.murder() will return True but not actually os.kill
-        self.killable = True
-        #
-        # String containing information about steps taken. Used for debugging
-        self.trace = ''
-        """
-        >>> print m.trace
-        Tue Aug 14 15:29:53 EDT 2012 pyt[3253] check(self)
-        Tue Aug 14 15:29:53 EDT 2012 pyt[3253] PID file /me/m.pid found
-        Tue Aug 14 15:29:53 EDT 2012 pyt[3253] Get old PID from /me/m.pid
-        Tue Aug 14 15:29:53 EDT 2012 pyt[3253] PID 3212 in /me/m.pid not running
-        Tue Aug 14 15:29:53 EDT 2012 pyt[3253] delete(self)
-        Tue Aug 14 15:30:02 EDT 2012 pyt[3253] create(self)
-        """
-        #
-        # Max age (in seconds) a lock file can be before it is
-        # considered invalid (too old to trust)
-        #self.maxage = 1     # 1 second
-        #self.maxage = 300   # 5 minutes
-        #self.maxage = 3600  # 1 hour
-        #self.maxage = 43200 # 12 hours
-        self.maxage = 86400 # 24 hours
+        self.hostname = str(node())
+        self.kill = bool(kill)
+        self.age_limit = int(age_limit)
         #
         # Name of file this is running as
-        self.this_exec = str(os.path.basename(sys.argv[0]))
-        arg0 = self.this_exec.replace('.py', '')
+        if name is None:
+            self.name = str(os.path.basename(sys.argv[0]))
+        else:
+            self.name = str(name)
+        arg0 = self.name.replace('.py', '')
         if len(arg0) < 3 or len(arg0) > 255:
             #
             # If arg zero is invalid, name me Python
             arg0 = 'Python'
         #
-        # Current executable and PID, like myapp[12345]
-        self.logname = '{0}[{1}]'.format(arg0, os.getpid())
-        self.hostname = node()
-        #
-        # Full path to lock file, default to /var/run/$0.pid
-        self.lockfile = '/var/run/{0}.pid'.format(arg0)
-        #
-        # If you need to double check lock status after calling Locker.create()
-        self.locked = False
-        self.log = self.Log(self.logname)
+        self.file = file.format(name=arg0)
+        self.log = self.Log(tag='{0}[{1}]'.format(arg0, os.getpid()))
+        self.log('init(age_limit={0}, file={1}, kill={2}, name={3}):'.format(
+            self.age_limit,
+            self.file,
+            self.kill,
+            self.name
+        ))
 
     class Log(object):
-        """ Track and report steps taken in this app."""
-        def __init__(self, logname):
+        """
+        Track and report steps taken in this app.
+        'tag' is "name[pid]", similar to the -t argument used in `/bin/logger`
+        """
+        def __init__(self, tag):
             """ Create new log """
             self.trace = ''
-            self.logname = logname
+            self.tag = tag
 
         def __call__(self, this):
             """ Add 'this' to my log """
             self.trace = '{OG}{Now} {Host} {Proc} {Event}\n'.format(
                 OG=self.trace,
-                Now=time.strftime('%a, %d %b %Y %H:%M:%S +0000', time.gmtime()),
+                Now=time.strftime('%c', time.localtime()),
                 Host=node(),
-                Proc=self.logname,
+                Proc=self.tag,
                 Event=this,
             )
 
         def __str__(self):
-            """ Return my log as multiline string """
+            """ Return my log as multi-line string """
             return self.trace
 
     def create(self):
@@ -172,29 +119,32 @@ class Locker(object):
         check() for existing lock file, if that returns True create a
         new lock file and return True.
         """
-        self.log('create(self)')
+        self.log('create()')
         if not self.check():
             return False
         try:
-            with open(self.lockfile, 'w') as handle:
+            with open(self.file, 'w') as handle:
                 handle.write('{0}\n'.format(os.getpid()))
-                self.locked = True
+                self.log('create() return True')
                 return True
-        except (FileNotFoundError, PermissionError) as error:
+        except Exception as error:
+            self.log(type(error))
             self.log(error)
         # all-else
+        self.log('create() return False')
         return False
 
     def delete(self):
         """
         Remove the lock file.
-        This can also be accessed as mylock.remove()
+        This can also be accessed as my_lock_file.remove()
         """
-        self.log('delete(self)')
+        self.log('delete()')
         try:
-            os.remove(self.lockfile)
+            os.remove(self.file)
             return True
         except Exception as error:
+            self.log(type(error))
             self.log(error)
         # all-else
         return False
@@ -207,136 +157,94 @@ class Locker(object):
 
     def check(self):
         """
-        Check for lock file, running proc, and name of running proc.
+        Check for lock file, running process, and validate name of running process.
 
-        Return True if is OK to start new process (not running or too old)
-        Return False if running, have to wait.
+        Return True if is OK to start new process.
+        Return False if old process still running, have to wait.
         """
-        self.log('check(self)')
-        if not os.path.exists(self.lockfile):
+        self.log('check()')
+        if not os.path.exists(self.file):
             self.log('No lock file found, assume not running')
             return True
         #
-        self.log('Lock file {0} found'.format(self.lockfile))
+        self.log('Lock file {0} found'.format(self.file))
         #
         try:
-            self.log('Get old PID from {0}'.format(self.lockfile))
-            with open(self.lockfile, 'r') as handle:
-                oldpid = handle.read().rstrip()
-        except (FileNotFoundError, PermissionError) as error:
+            self.log('Get old PID from {0}'.format(self.file))
+            with open(self.file, 'r') as handle:
+                contents = handle.read().rstrip()
+                #
+                # If the contents of the file cannot be converted to an integer should we overwrite?
+                pid = int(contents)
+        except Exception as error:
+            self.log(type(error))
             self.log(error)
             return False
         #
-        self.log('PID is {0}'.format(oldpid))
+        self.log('PID is {0}'.format(pid))
         #
-        if os.path.exists(os.path.join('proc', oldpid)):
-            self.log('PID {0} is running'.format(oldpid))
+        if os.path.exists('/proc/{0}'.format(pid)):
+            self.log('PID {0} is running'.format(pid))
         else:
-            self.log('PID {0} not found in process table'.format(oldpid))
-            if self.delete():
-                return True
-            return False
+            self.log('PID {0} not found in process table'.format(pid))
+            return True
         #
-        cmdline = os.path.join('proc', oldpid, 'cmdline')
+        cmdline = '/proc/{0}/cmdline'.format(pid)
         try:
-            self.log('Check name, args in /proc/{0}/cmdline'.format(oldpid))
+            self.log('Check name, args in {0}'.format(cmdline))
             with open(cmdline, 'r') as handle:
                 current_process = handle.read()
-        except (FileNotFoundError, PermissionError) as error:
+        except Exception as error:
+            self.log(type(error))
             self.log(error)
             return False
         #
-        if self.this_exec not in current_process:
-            self.log('"{0}" not found in {1}'.format(
-                self.this_exec,
-                cmdline,
+        if self.name not in current_process:
+            self.log('"{0}" not found in "{1}"'.format(
+                self.name,
+                current_process,
                 ))
-            if self.delete():
-                return True
-            return False
+            return True
         #
-        self.log('"{0}" was found in {1}'.format(
-            self.this_exec,
-            cmdline,
+        self.log('"{0}" was found in "{1}"'.format(
+            self.name,
+            current_process,
             ))
         self.log(current_process)
         self.log('Check the age of the lock file')
-        file_mtime = int(os.path.getmtime(self.lockfile))
-        diff = int(time.time()) - file_mtime
-        if diff > self.maxage:
-            self.log('Lock file too old, diff={0}'.format(diff))
-            if self.murder(oldpid):
-                return True
-            return False
+        difference = int(time.time()) - int(os.path.getmtime(self.file))
+        if difference >= self.age_limit:
+            self.log('Lock file too old, diff={0}'.format(difference))
+            return self.murder(pid)
         else:
             #
             # Lock file was created recently, PID
             # still running and the process looks
             # like this application, refuse new lock
-            self.log('Lock file is recent, diff={0}'.format(diff))
+            self.log('Lock file is recent, time difference={0}'.format(difference))
             return False
 
-    def murder(self, oldpid=None):
+    def murder(self, pid=None):
         """
         Try to kill pid found in the lock file
         """
-        self.log('murder(self, {0})'.format(oldpid))
-        if not oldpid:
-            # __backcap__
-            self.log('oldpid is None')
+        self.log('murder({0})'.format(pid))
+        if not pid:
+            self.log('pid is None or False')
             return False
-        if not isinstance(oldpid, int):
-            # __backcap__
-            self.log('oldpid not an integer')
+        if not isinstance(pid, int):
+            self.log('pid is not an integer')
             return False
-        if not self.killable:
+        if self.kill is not True:
             self.log('Not allowed to kill')
             return True
         try:
             #
             # send `kill -9 ${PID}`
-            os.kill(oldpid, 9)
+            os.kill(pid, 9)
             return True
         except Exception as error:
-            # No pid or no permissions (usually)
+            # Usually pid not running or unable to terminate process due to OS permissions.
+            self.log(type(error))
             self.log(error)
         return False
-
-
-def main():
-    """
-    If you want to use this for shell scripts or unix apps do this:
-
-    me@pybox01:~$ python ./locker.py create ./foo.pid ; echo $?
-    0
-    me@pybox01:~$ python ./locker.py delete ./foo.pid ; echo $?
-    0
-    me@pybox01:~$
-
-    in shell code
-    python ./locker.py create ./foo.pid || exit $?
-
-    """
-    if not sys.argv[1:] and sys.stdin.isatty():
-        sys.exit(1)
-    mylock = Locker()
-    if sys.argv[2:]:
-        mylock.lockfile = sys.argv[2]
-    #
-    if 'create' in sys.argv[1]:
-        if mylock.create():
-            print(mylock.log)
-            sys.exit(0)
-        sys.exit(1)
-    #
-    if 'delete' in sys.argv[1]:
-        if mylock.delete():
-            print(mylock.log)
-            sys.exit(0)
-        sys.exit(1)
-    #
-    # all-else
-    sys.exit(1)
-
-if __name__ == '__main__':
-    main()

@@ -1,14 +1,9 @@
 #!/usr/bin/env python
-"""
-
-"""
+from __future__ import absolute_import
 import locker
 
 
 def main():
-    """
-
-    """
     print('#### instance')
     # a = locker.Locker(file='./foo.pid', age_limit=1)
     # a = locker.Locker(age_limit=0)

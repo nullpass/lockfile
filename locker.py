@@ -8,7 +8,7 @@ locker.py - Provide easy lock file management as a class for other Python progra
 
 """
 
-__version__ = '0.3.b'
+__version__ = '0.4.b'
 import time
 import os
 from platform import node
@@ -122,32 +122,19 @@ class Locker(object):
         self.log('create()')
         if not self.check():
             return False
-        try:
-            with open(self.file, 'w') as handle:
-                handle.write('{0}\n'.format(os.getpid()))
-                self.log('create() return True')
-                return True
-        except Exception as error:
-            self.log(type(error))
-            self.log(error)
-        # all-else
-        self.log('create() return False')
-        return False
+        with open(self.file, 'w') as handle:
+            handle.write('{0}\n'.format(os.getpid()))
+            self.log('create() return True')
+        return True
 
     def delete(self):
         """
         Remove the lock file.
         This can also be accessed as my_lock_file.remove()
         """
-        self.log('delete()')
-        try:
-            os.remove(self.file)
-            return True
-        except Exception as error:
-            self.log(type(error))
-            self.log(error)
-        # all-else
-        return False
+        self.log('delete({0})'.format(self.file))
+        os.remove(self.file)
+        return True
 
     def remove(self):
         """
@@ -173,8 +160,6 @@ class Locker(object):
             self.log('Get old PID from {0}'.format(self.file))
             with open(self.file, 'r') as handle:
                 contents = handle.read().rstrip()
-                #
-                # If the contents of the file cannot be converted to an integer should we overwrite?
                 pid = int(contents)
         except Exception as error:
             self.log(type(error))
